@@ -1,0 +1,5 @@
+#ifndef IMUINTEGRATOR
+#define IMUINTEGRATOR
+
+#endif // IMUINTEGRATOR
+

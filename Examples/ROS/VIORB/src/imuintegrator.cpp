@@ -1,10 +1,11 @@
 #include "imuintegrator.h"
 
-namespace ORB_SLAM2
-{
+//namespace ORB_SLAM2
+//{
 using namespace std;
 IMUIntegrator::IMUIntegrator()
 {
+    Initial();
 
 }
 
@@ -49,7 +50,9 @@ void IMUIntegrator::update(const Vector3d& omega, const Vector3d& acc, const dou
 
     _cov_P_minus = _sys_F_d*_cov_P*_sys_F_d.transpose()+_cov_Q_d;
 
-    //Mea Update
+    //Measurement Update
+    MUpdateNo();
+    cout<<"_P-"<<_P_minus<<endl;
 
 }
 
@@ -60,11 +63,50 @@ void IMUIntegrator::Initial()
     _cov_Q_c.block<3,3>(3,3) = IMUData::getAccBiasRWCov();
     _cov_Q_c.block<3,3>(6,6) = IMUData::getGyrMeasCov();
     _cov_Q_c.block<3,3>(9,9) = IMUData::getGyrBiasRWCov();
-    cout<<"Qc:  "<<_cov_Q_c<<endl;
+
+    //estimate state
+    _P.setZero();         // position
+    _V.setZero();         // velocity
+    _q.setIdentity();      // rotation w+xi+yj+zk double
+    _R.setZero();         // rotation matrix
+    // keep unchanged
+    _BiasGyr.setZero();   // bias of gyroscope
+    _BiasAcc.setZero();   // bias of accelerometer
+    // scale
+     _scale = 0.0;
+
+    _P_minus.setZero();
+    _V_minus.setZero();
+    _q_minus.setIdentity();
+    _Bg_minus.setZero();
+    _Ba_minus.setZero();
+    _scale_minus = 0.0;
+
+    _sys_F_d.setIdentity();
+    _sys_F_c.setZero();
+
+    _cov_G_c.setZero();
+    _cov_M.setIdentity();
+    _cov_Q_d.setIdentity();
+
+    _cov_P_minus.setIdentity();      //Pk+1-=Fd*Pk*Fd^T+Qd
+    _cov_P.setIdentity();            //Pk+1=(I-Kk+1H)Pk+1-
+    cout<<"IMU Initialed"<<endl;
 }
 void IMUIntegrator::TimeUpdate()
 {
 
+}
+void IMUIntegrator::MUpdateNo()
+{
+    _P = _P_minus;
+    _V = _V_minus;
+    _q = _q_minus;
+    _BiasGyr = _Bg_minus;
+    _BiasAcc = _Ba_minus;
+    _scale = _scale_minus;
+
+    _cov_P = _cov_P_minus;
 }
 
 Quaterniond IMUIntegrator::wToq(const Vector3d w, double _dt) //[0 0.5*w*dt]
@@ -83,4 +125,4 @@ Quaterniond IMUIntegrator::qps(Quaterniond qq, double ss)
 }
 
 
-}
+//}

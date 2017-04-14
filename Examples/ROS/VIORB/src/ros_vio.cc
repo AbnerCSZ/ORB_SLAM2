@@ -24,22 +24,10 @@
 #include<fstream>
 #include<chrono>
 
-//#include<ros/ros.h>
-//#include <cv_bridge/cv_bridge.h>
-
 #include<opencv2/core/core.hpp>
 #include<opencv2/highgui/highgui.hpp>
 #include<opencv2/imgproc/imgproc.hpp>
 #include"../../../include/System.h"
-
-//#include "MsgSync/MsgSynchronizer.h"
-
-//#include "../../../src/IMU/imudata.h"
-//#include "../../../src/IMU/configparam.h"
-
-//#include <rosbag/bag.h>
-//#include <rosbag/view.h>
-
 
 #include <boost/foreach.hpp>
 #include <fstream>
@@ -54,20 +42,10 @@
 //#include "Eigen/Dense"
 #include "imudata.h"
 #include "configparam.h"
+#include "imuintegrator.h"
 
 using namespace std;
 //using namespace Eigen;
-
-/*class ImageGrabber
-{
-public:
-    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM){}
-
-   // void GrabImage(const sensor_msgs::ImageConstPtr& msg);
-
-    ORB_SLAM2::System* mpSLAM;
-};
-*/
 
 typedef struct ImageList
 {
@@ -75,6 +53,10 @@ typedef struct ImageList
 	string imgName;
 }ICell;
 
+void UpdateNoORB()
+{
+
+}
 void loadImageList(char * imagePath,std::vector<ICell> &iListData)
 {
     ifstream inf;
@@ -197,7 +179,7 @@ int main(int argc, char **argv)
 
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
+   // ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
 
     ConfigParam config(argv[2]);
 
@@ -216,22 +198,33 @@ int main(int argc, char **argv)
     memset(fullPath,0,500);
 
     std::vector<IMUData> allimuData;
+    std::vector<IMUData> vimuData;
     std::vector<ICell> iListData;
 
     //load IMU
     loadIMUFile(argv[3],allimuData);
-    cout<<"loading imu finished"<<endl;
+    cout<<"----------loading imu finished----------"<<endl;
+    vimuData = allimuData;
+    vimuData[0]._t=0;
+    double e = pow(10.0,-9);
+    for(int m=1;m<vimuData.size();m++)
+    {
+        vimuData[m]._t = (allimuData[m]._t-allimuData[m-1]._t)*e;   //dt
+    }
+    cout<<"---------------vimuData got--------------"<<endl;
 
     //load IMG
     loadImageList(argv[4],iListData);
-    cout<<"loading image finished"<<endl;
+    cout<<"---------------loading image finished-----"<<endl;
 
-    double e = pow(10.0,-9);
+
+    IMUIntegrator EKF;
+
 
  //   for(int j=0;j<iListData.size();j++)
-    for(int j=0;j<50;j++)
+    for(int j=0;j<30;j++)
     {
-            std::vector<IMUData> vimuData;
+
 	    /*
 	    *imu 的频率是200HZ 图像帧率是20HZ 所以简单的认为每一帧图像对应10个imu数据
 	    */
@@ -248,21 +241,22 @@ int main(int argc, char **argv)
                     allimuData[j]._a(1) *= g3dm;
                     allimuData[j]._a(2) *= g3dm;
                 }
-                //cout<<allimuData[j]._g(0)<<","<<allimuData[j]._g(1)<<","<<allimuData[j]._g(2)<<endl;
-		//cout<<allimuData[j]._a(0)<<","<<allimuData[j]._a(1)<<","<<allimuData[j]._a(2)<<endl;
-		//printf("imutimestamp,%0.10f\n",(double)allimuData[j]._t);
-                allimuData[j]._t = allimuData[j]._t*e;
+
 		/*
 		*这里将时间戳×上e-9后的结果，程序可以正常运行，但是显示出来的时间和ros环境下的时间不同，且运行速度缓慢。
 		ORB_SLAM2::IMUData imudata(allimuData[j]._g(0),allimuData[j]._g(1),allimuData[j]._g(2),
                                 allimuData[j]._a(0),allimuData[j]._a(1),allimuData[j]._a(2),(double)allimuData[j]._t);
 		*/
 		//时间戳按这个给程序也可以正常运行，速度基本和ros环境下一样，问题在于当按照正常的0.005设置时候程序会挂，后来尝试后发现这个数据给的越小程序越容易运行成功。
-                IMUData imudata(allimuData[j]._g(0),allimuData[j]._g(1),allimuData[j]._g(2),
-                                allimuData[j]._a(0),allimuData[j]._a(1),allimuData[j]._a(2),j*0.0005+i*0.00005);
-                vimuData.push_back(imudata);
+//                IMUData imudata(allimuData[10*j+i]._g(0),allimuData[10*j+i]._g(1),allimuData[10*j+i]._g(2),
+//                               // allimuData[10*j+i]._a(0),allimuData[10*j+i]._a(1),allimuData[10*j+i]._a(2),j*0.0005+i*0.00005);
+//                                 allimuData[10*j+i]._a(0),allimuData[10*j+i]._a(1),allimuData[10*j+i]._a(2),allimuData[10*j+i]._t);
+//                vimuData.push_back(imudata);
+
+                EKF.update(vimuData[10*j+i]._g, vimuData[10*j+i]._a, vimuData[10*j+i]._t);
+
             }
-	   
+return 0;
             //cout<<"IMU FINISHED READING"<<endl;
 	    //发现读取txt时，图像文件名后多了一个‘/r’，因此需要截掉这个字符。
 	    string temp = iListData[j].imgName.substr(0,iListData[j].imgName.size()-1);
@@ -274,17 +268,31 @@ int main(int argc, char **argv)
 	  //  cout<<"-----------------------FYJ----------------------"<<iListData[j].timeStamp<<endl;
 	    iListData[j].timeStamp = iListData[j].timeStamp*e;
         // Pass the image to the SLAM system
-//        Matrix4d eigenT = Matrix4d::Identity();
-       // cv::Mat TfromORB(4,4,CV_32F);
-       SLAM.TrackMonocular(im,(double)iListData[j].timeStamp);
-       cout<<"yici"<<endl;
-       // TfromORB = SLAM.TrackMonocular(im,(double)iListData[j].timeStamp).clone();
-////        Eigen::Map<Matrix4f> eigenT( TfromORB.ptr<float>(), TfromORB.rows,TfromORB.cols );
-//        for(int i=0;i<4;i++)
-//            for(int j=0;j<4;j++)
-//                eigenT(i,j) = TfromORB.at<float>(i,j) ;
-//        cout<<eigenT<<endl;
+        Matrix4d eigenT = Matrix4d::Identity();
+        cv::Mat TfromORB(4,4,CV_32F);
+/*
+        TfromORB = SLAM.TrackMonocular(im,(double)iListData[j].timeStamp).clone();
+//        Eigen::Map<Matrix4f> eigenT( TfromORB.ptr<float>(), TfromORB.rows,TfromORB.cols );
 
+        if(TfromORB.empty())
+        {
+            //
+        }
+        else
+        {
+        if(!TfromORB.empty())   //不加的话会段存储错误
+        {
+        for(int _i=0;_i<4;_i++)
+            for(int _j=0;_j<4;_j++)
+            {
+                eigenT(_i,_j) = TfromORB.at<float>(_i,_j) ;
+            }
+        }
+        cout<<eigenT<<endl;
+        cout<<TfromORB<<endl;
+        }
+
+*/
 	    //printf("imagetimestamp,%0.10f\n",(double)iListData[j].timeStamp);
 	    //SLAM.TrackMonoVI(im, vimuData, (double)iListData[j].timeStamp);
         //    SLAM.TrackMonoVI(im, vimuData, j*0.00005);
@@ -309,11 +317,11 @@ int main(int argc, char **argv)
     getchar();
 
     // Stop all threads
-    SLAM.Shutdown();
+  //  SLAM.Shutdown();
 
-;
 
-    return 0;
+
+  //  return 0;
 }
 
 

@@ -1,0 +1,1 @@
+./Examples/ROS/VIORB/build/VIO Vocabulary/ORBvoc.txt config/euroc.yaml ~/EuRoc/V1_02_medium/mav0/imu0/data.csv ~/EuRoc/V1_02_medium/mav0/cam0/data.csv ~/EuRoc/V1_02_medium/mav0/cam0/data

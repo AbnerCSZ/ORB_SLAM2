@@ -46,15 +46,14 @@ ${PROJECT_SOURCE_DIR}/../../../lib/libORB_SLAM2.so
 )
 
 
-add_library(CONFIG SHARED
+add_library(MYLIB SHARED
 src/configparam.cpp
 src/imudata.cpp
 src/imuintegrator.cpp
-#include/configparam.h
-#include/imudata.h
+
 )
 
-target_link_libraries(CONFIG
+target_link_libraries(MYLIB
 ${LIBS}
 )
 
@@ -62,7 +61,7 @@ add_executable(VIO
 src/ros_vio.cc
 )
 target_link_libraries(VIO
-CONFIG
+MYLIB
 ${LIBS}
 )
 

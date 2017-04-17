@@ -190,9 +190,9 @@ int main(int argc, char **argv)
      */
     double imageMsgDelaySec = config.GetImageDelayToIMU();
 
-    // 3dm imu output per g. 1g=9.80665 according to datasheet
-    const double g3dm = 9.80665;
     const bool bAccMultiply98 = config.GetAccMultiply9p8();
+    Matrix3d Rci = config.GetEigTbc().block<3,3>(0,0);
+    Vector3d Tci = config.GetEigTbc().block<3,1>(0,3);
     cout<<"-------------------param got!---------------------------------------------"<<endl;
     char *fullPath = new char[500];
     memset(fullPath,0,500);
@@ -209,6 +209,13 @@ int main(int argc, char **argv)
     double e = pow(10.0,-9);
     for(int m=1;m<vimuData.size();m++)
     {
+         /* if(bAccMultiply98)
+        {
+            allimuData[m]._a(0) *= g3dm;
+            allimuData[m]._a(1) *= g3dm;
+            allimuData[m]._a(2) *= g3dm;
+        }*/
+
         vimuData[m]._t = (allimuData[m]._t-allimuData[m-1]._t)*e;   //dt
     }
     cout<<"---------------vimuData got--------------"<<endl;
@@ -219,7 +226,7 @@ int main(int argc, char **argv)
 
 
     IMUIntegrator EKF;
-
+return 0;
 
  //   for(int j=0;j<iListData.size();j++)
     for(int j=0;j<30;j++)
@@ -230,18 +237,6 @@ int main(int argc, char **argv)
 	    */
             for(unsigned int i=0;i<10;i++)
             {
-//                cout<<"*************************************************************************"<<endl;
-                char temp[10] = {0};
-		
-                //substring(temp,imuTime,0,10);
-  //              cout<<"=========================================================================="<<endl;
-                if(bAccMultiply98)
-                {
-                    allimuData[j]._a(0) *= g3dm;
-                    allimuData[j]._a(1) *= g3dm;
-                    allimuData[j]._a(2) *= g3dm;
-                }
-
 		/*
 		*这里将时间戳×上e-9后的结果，程序可以正常运行，但是显示出来的时间和ros环境下的时间不同，且运行速度缓慢。
 		ORB_SLAM2::IMUData imudata(allimuData[j]._g(0),allimuData[j]._g(1),allimuData[j]._g(2),
@@ -253,19 +248,17 @@ int main(int argc, char **argv)
 //                                 allimuData[10*j+i]._a(0),allimuData[10*j+i]._a(1),allimuData[10*j+i]._a(2),allimuData[10*j+i]._t);
 //                vimuData.push_back(imudata);
 
-                EKF.update(vimuData[10*j+i]._g, vimuData[10*j+i]._a, vimuData[10*j+i]._t);
+                EKF.updateNOv(vimuData[10*j+i]._g, vimuData[10*j+i]._a, vimuData[10*j+i]._t);
 
             }
-return 0;
+
             //cout<<"IMU FINISHED READING"<<endl;
 	    //发现读取txt时，图像文件名后多了一个‘/r’，因此需要截掉这个字符。
 	    string temp = iListData[j].imgName.substr(0,iListData[j].imgName.size()-1);
 
         sprintf(fullPath,"%s/%s",argv[5],temp.c_str());
 	    cv::Mat im = cv::imread(fullPath,0);
-      //  cout<<fullPath<<endl;
 	    memset(fullPath,0,100);
-	  //  cout<<"-----------------------FYJ----------------------"<<iListData[j].timeStamp<<endl;
 	    iListData[j].timeStamp = iListData[j].timeStamp*e;
         // Pass the image to the SLAM system
         Matrix4d eigenT = Matrix4d::Identity();
@@ -321,7 +314,7 @@ return 0;
 
 
 
-  //  return 0;
+    //return 0;
 }
 
 
